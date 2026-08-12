@@ -1,0 +1,31 @@
+# Environment files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/*.tsbuildinfo
+npm-debug.log*
+
+# Go
+backend/bin/
+backend/build/
+backend/tmp/
+backend/*.exe
+backend/*.test
+backend/*.out
+backend/coverage.out
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
