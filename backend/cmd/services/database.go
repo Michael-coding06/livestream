@@ -44,20 +44,20 @@ func (s *StatsQuerier) GetRoomStats(roomID string) (*RoomStats, error) {
 	return stats, nil
 }
 
-func (s *StatsQuerier) UpdateStats(e event.Event) {
+func (s *StatsQuerier) UpdateStats(e event.EventPayload) {
 	column := statColumn(e.Type)
 	if column == "" {
 		return
 	}
-	
+
 	fmt.Print("The update stats is called")
- 
+
 	query := fmt.Sprintf(`
 		INSERT INTO room_stats (room_id, %s)
 		VALUES (?, 1)
 		ON DUPLICATE KEY UPDATE %s = %s + 1
 	`, column, column, column)
- 
+
 	_, err := s.db.Exec(query, e.RoomID)
 	if err != nil {
 		log.Printf("update stats error: %v\n", err)

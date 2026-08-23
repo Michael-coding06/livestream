@@ -1,14 +1,26 @@
 export type Mode = "admin" | "user";
 
+export type RoomStatus = "live" | "offline";
+
 export interface Room {
   id: number;
   name: string;
   host: string;
-  emoji: string;
-  bgClass: string;
-  bgColor: string;
-  tag: string;
-  accentColor: string;
+  description?: string;
+  status: RoomStatus;
+  viewers: number;
+  createdAt: Date;
+  emoji?: string;
+  bgClass?: string;
+  bgColor?: string;
+  tag?: string;
+  accentColor?: string;
+}
+
+export interface RoomPayload {
+  name: string;
+  host: string;
+  description: string;
 }
 
 export interface RoomStats {

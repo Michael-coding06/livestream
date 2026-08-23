@@ -6,14 +6,16 @@ const useCreateComment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createComment = async (comment: string, roomID: number) => {
+  const createComment = async (comment: string, roomID: number, username: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const res = await api.post(`/comment/create?room_id=${roomID}`, {
+      const res = await api.post(`/comment/create`, {
+        roomID,
         comment,
-        user_id: "guest",
+        username,
+        user_id: -1,
       });
       return res.data.comment;
     } catch (error) {

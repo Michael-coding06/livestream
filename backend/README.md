@@ -11,7 +11,7 @@ This project demonstrates:
 - Redis gift leaderboard
 - Docker Compose orchestration
 
-## Run
+## Run  
 
 ```bash
 go mod tidy
@@ -35,7 +35,7 @@ curl http://localhost:8087/health
 Send an event:
 
 ```bash
-curl -X POST http://localhost:8087/events -H "Content-Type: application/json" -d "{\"room_id\":\"room1\",\"user_id\":\"user1\",\"type\":\"gift\",\"gift_value\":10}"
+curl -X POST http://localhost:8087/events -H "Content-Type: application/json" -d "{\"room_id\":\"room1\",\"user_id\":\"user10\",\"type\":\"gift\",\"gift_value\":100}"
 ```
 
 Read room stats:
@@ -58,3 +58,5 @@ Supported `type` values:
 - `like`
 - `gift`
 - `join`
+
+docker compose exec mysql mysql -uroot -p

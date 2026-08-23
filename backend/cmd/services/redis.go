@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 
 	event "streampulse/models"
 
@@ -23,18 +24,18 @@ func (l *LeaderboardQuerier) GetTopUsers(ctx context.Context, roomID string) ([]
 	return l.rdb.ZRevRangeWithScores(ctx, key, 0, 9).Result()
 }
 
-func (l *LeaderboardQuerier) UpdateLeaderboard(ctx context.Context, e event.Event) {
+func (l *LeaderboardQuerier) UpdateLeaderboard(ctx context.Context, e event.EventPayload, giftValue int) {
 	// if e.Type != "gift" {
 	// 	return
 	// }
 	fmt.Println("The update at the redis has been called")
-	score := float64(e.GiftValue)
+	score := float64(giftValue)
 	if score <= 0 {
 		score = 1
 	}
 
-	key := fmt.Sprintf("leaderboard:%s", e.RoomID)
-	if err := l.rdb.ZIncrBy(ctx, key, score, e.UserID).Err(); err != nil {
+	key := fmt.Sprintf("leaderboard:%d", e.RoomID)
+	if err := l.rdb.ZIncrBy(ctx, key, score, strconv.Itoa(e.UserID)).Err(); err != nil {
 		log.Printf("leaderboard update error: %v\n", err)
 	}
 }

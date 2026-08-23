@@ -36,16 +36,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	
 	stats := services.NewStatsQuerier(db)
 	rdb := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
 	leaderboard := services.NewLeaderboardQuerier(rdb)
 
-	consumer := services.NewKafkaConsumer(leaderboard, stats)
+	consumer := services.NewKafkaConsumer(leaderboard, stats, db, rdb)
 	defer consumer.Close()
 
 	log.Println("consumer started, listening on topic:", "event")
 	go consumer.ReadLoop(ctx)
 
-	<-ctx.Done() 
+	<-ctx.Done()
 	log.Println("consumer shutting down")
 }

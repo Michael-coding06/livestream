@@ -1,8 +1,34 @@
 import type { Room, GiftType } from "../types";
 
 export const ROOMS: Room[] = [
-  { id: 1, name: "MusicVibes", host: "DJ_Nova", emoji: "🎵", bgClass: "bg-room-1", bgColor: "#1a1a2e", tag: "Music", accentColor: "#7f77dd" },
-  { id: 2, name: "GamingArena", host: "ProGamer_X", emoji: "🎮", bgClass: "bg-room-2", bgColor: "#0d1b2a", tag: "Gaming", accentColor: "#378add" },
+  {
+    id: 1,
+    name: "MusicVibes",
+    host: "DJ_Nova",
+    description: "Lo-fi coding set",
+    status: "offline",
+    viewers: 0,
+    createdAt: new Date(),
+    emoji: "🎵",
+    bgClass: "bg-room-1",
+    bgColor: "#1a1a2e",
+    tag: "Music",
+    accentColor: "#7f77dd",
+  },
+  {
+    id: 2,
+    name: "GamingArena",
+    host: "ProGamer_X",
+    description: "Evening ranked grind",
+    status: "offline",
+    viewers: 0,
+    createdAt: new Date(),
+    emoji: "🎮",
+    bgClass: "bg-room-2",
+    bgColor: "#0d1b2a",
+    tag: "Gaming",
+    accentColor: "#378add",
+  },
 ];
 
 export const GIFTS: GiftType[] = [

@@ -1,8 +1,17 @@
 package event
 
-type Event struct {
-	RoomID    string `json:"room_id"`
-	UserID    string `json:"user_id"`
+// Event acts as the base envelope for all Kafka messages
+type EventPayload struct {
+	RoomID    int    `json:"room_id"`
+	UserID    int    `json:"user_id"`
 	Type      string `json:"type"`
 	GiftValue int    `json:"gift_value"`
+	Content   string `json:"content"`
+	Username  string `json:"username"`
+}
+
+type CommentPayload struct {
+	RoomID int    `json:"room_id"`
+	UserID int    `json:"user_id"`
+	Type   string `json:"type"`
 }
