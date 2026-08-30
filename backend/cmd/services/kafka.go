@@ -90,11 +90,12 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context) {
 
 		// consumer scans and pulls new event
 		msg, err := k.reader.ReadMessage(ctx)
+		log.Printf("hello\n")
 		if err != nil {
 			log.Printf("read error: %v", err)
 			continue
 		}
-		fmt.Printf("hello\n")
+
 		var e event.EventPayload
 		// convert raw Json data to Go data
 		if err := json.Unmarshal(msg.Value, &e); err != nil {
@@ -130,16 +131,16 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context) {
 			pipe.LTrim(ctx, listKey, 0, 9)          // Keep only index 0 to 9 (10 comments)
 			pipe.Expire(ctx, listKey, 24*time.Hour) // Auto-delete room data after 24h
 
-			if _, err := pipe.Exec(ctx); err != nil {
-				log.Printf("failed to update redis comments list: %v", err)
-			}
+			go func() {
+				if _, err := pipe.Exec(ctx); err != nil {
+					log.Printf("failed to update redis comments list: %v", err)
+				}
 
-			// 4. Real-time Delivery: Publish to Redis Pub/Sub
-			pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
-			if err := k.rdb.Publish(ctx, pubsubChannel, commentJSON).Err(); err != nil {
-				log.Printf("failed to publish comment to pub/sub: %v", err)
-			}
-
+				pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
+				if err := k.rdb.Publish(ctx, pubsubChannel, commentJSON).Err(); err != nil {
+					log.Printf("failed to publish comment to pub/sub: %v", err)
+				}
+			}()
 		default:
 			log.Printf("unknown event type received: %s", e.Type)
 		}

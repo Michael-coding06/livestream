@@ -54,10 +54,11 @@ func CreateComment(kafka *services.KafkaProducer) gin.HandlerFunc {
 			Content:  commentText,
 			Username: username,
 		}
-
-		if err := kafka.Produce(ctx, eventPayload); err != nil {
-			log.Printf("kafka comment produce error: %v", err)
-		}
+		go func() {
+			if err := kafka.Produce(ctx, eventPayload); err != nil {
+				log.Printf("kafka comment produce error: %v", err)
+			}
+		}()
 
 		c.JSON(202, gin.H{
 			"status":  "queued",
