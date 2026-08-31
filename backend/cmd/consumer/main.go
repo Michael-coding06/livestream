@@ -17,6 +17,11 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+const (
+	WorkerCount = 10
+	BufferSize  = 1000
+)
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("no .env file found, relying on real env vars")
@@ -36,7 +41,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	stats := services.NewStatsQuerier(db)
 	rdb := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
 	leaderboard := services.NewLeaderboardQuerier(rdb)
@@ -45,7 +50,7 @@ func main() {
 	defer consumer.Close()
 
 	log.Println("consumer started, listening on topic:", "event")
-	go consumer.ReadLoop(ctx)
+	go consumer.ReadLoop(ctx, WorkerCount, BufferSize)
 
 	<-ctx.Done()
 	log.Println("consumer shutting down")

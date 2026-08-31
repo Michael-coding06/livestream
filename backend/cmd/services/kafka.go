@@ -28,9 +28,11 @@ type KafkaProducer struct {
 func NewKafkaProducer() *KafkaProducer {
 	return &KafkaProducer{
 		writer: &kafka.Writer{
-			Addr:     kafka.TCP(brokerAddress),
-			Topic:    topic,
-			Balancer: &kafka.LeastBytes{},
+			Addr:         kafka.TCP(brokerAddress),
+			Topic:        topic,
+			Balancer:     &kafka.LeastBytes{},
+			BatchTimeout: 100 * time.Millisecond,
+			BatchSize:    100,
 			// AllowAutoTopicCreation: true,
 		},
 	}
@@ -67,6 +69,8 @@ func NewKafkaConsumer(leaderboard *LeaderboardQuerier, stats *StatsQuerier, db *
 			Brokers: []string{brokerAddress},
 			Topic:   topic,
 			GroupID: "event-group-1",
+			MaxWait: 100 * time.Millisecond, // wait for the at most 0.1s
+
 		}),
 		leaderboard: leaderboard,
 		stats:       stats,
@@ -80,22 +84,35 @@ func (k *KafkaConsumer) Close() error {
 }
 
 // This is the function to keep pulling message from kafka, this will be made a goroutine in the main file
-func (k *KafkaConsumer) ReadLoop(ctx context.Context) {
+func (k *KafkaConsumer) ReadLoop(ctx context.Context, workerCount int, bufferSize int) {
+	jobs := make(chan kafka.Message, bufferSize) // jobs channel can store at most 1000 messages
+
+	for i := 1; i <= workerCount; i++ {
+		go k.worker(ctx, i, jobs)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
+			close(jobs)
 			return
 		default:
 		}
 
 		// consumer scans and pulls new event
 		msg, err := k.reader.ReadMessage(ctx)
-		log.Printf("hello\n")
 		if err != nil {
 			log.Printf("read error: %v", err)
 			continue
 		}
 
+		// push the message into the channel, the workers will handle the later logic
+		jobs <- msg
+	}
+}
+
+func (k *KafkaConsumer) worker(ctx context.Context, workerID int, jobs <-chan kafka.Message) {
+	for msg := range jobs {
 		var e event.EventPayload
 		// convert raw Json data to Go data
 		if err := json.Unmarshal(msg.Value, &e); err != nil {
@@ -103,7 +120,7 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context) {
 			continue
 		}
 
-		fmt.Printf("kafka event: %+v\n", e)
+		fmt.Printf("Worker [%d] received an event: %s\n", workerID, e.Type)
 		// go k.stats.UpdateStats(e)
 		switch e.Type {
 		case "gift":
@@ -131,19 +148,17 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context) {
 			pipe.LTrim(ctx, listKey, 0, 9)          // Keep only index 0 to 9 (10 comments)
 			pipe.Expire(ctx, listKey, 24*time.Hour) // Auto-delete room data after 24h
 
-			go func() {
-				if _, err := pipe.Exec(ctx); err != nil {
-					log.Printf("failed to update redis comments list: %v", err)
-				}
+			if _, err := pipe.Exec(ctx); err != nil {
+				log.Printf("failed to update redis comments list: %v", err)
+			}
 
-				pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
-				if err := k.rdb.Publish(ctx, pubsubChannel, commentJSON).Err(); err != nil {
-					log.Printf("failed to publish comment to pub/sub: %v", err)
-				}
-			}()
+			pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
+			if err := k.rdb.Publish(ctx, pubsubChannel, commentJSON).Err(); err != nil {
+				log.Printf("failed to publish comment to pub/sub: %v", err)
+			}
+
 		default:
 			log.Printf("unknown event type received: %s", e.Type)
 		}
-		log.Printf("Received event: %+v", e)
 	}
 }
