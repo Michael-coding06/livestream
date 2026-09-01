@@ -20,6 +20,14 @@ function normalizeText(v: string) {
   return v.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function roomSlug(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 type WsCommentPayload = {
   room_id?: number;
   user_id?: number;
@@ -204,8 +212,11 @@ export function useStudioSession(
 
   const copyLink = useCallback(async () => {
     if (!room) return;
+    const path = `/${roomSlug(room.name || "room")}`;
+    const url = `${window.location.origin}${path}`;
+
     try {
-      await navigator.clipboard.writeText(`https://livestream.app/r/${room.id}`);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
       copyTimerRef.current = window.setTimeout(() => setCopied(false), 2000);
@@ -224,9 +235,6 @@ export function useStudioSession(
     try {
       const norm = normalizeText(text);
       pendingMineRef.current.add(norm);
-
-      // Optimistic render
-      pushChatMessage(name, text);
 
       await createComment(text, room.id, name);
       setChatInput("");

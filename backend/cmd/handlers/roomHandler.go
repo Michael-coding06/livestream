@@ -33,18 +33,26 @@ func CreateRoom(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`
+		result, err := db.Exec(`
 			INSERT INTO rooms (room_name, host)
 			VALUES (?, ?)
-		`, roomName, host); err != nil {
+		`, roomName, host)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create room"})
+			return
+		}
+
+		roomID, err := result.LastInsertId()
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create room"})
 			return
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
 			"room": gin.H{
-				"name": roomName,
-				"host": host,
+				"room_id": roomID,
+				"name":    roomName,
+				"host":    host,
 			},
 		})
 	}

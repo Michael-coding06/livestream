@@ -45,9 +45,9 @@ export function LiveRoom({ room, stats, onBack, onSendGift, onLike: _onLike, onC
   const handleSendComment = useCallback(async () => {
     const text = commentText.trim();
     if (!text) return;
-    
+
     try {
-      await createComment(text, room.id);
+      await createComment(text, room.id, "you");
       pushMessage(text);
       onComment();
       setCommentText("");

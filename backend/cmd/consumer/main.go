@@ -20,6 +20,7 @@ import (
 const (
 	WorkerCount = 10
 	BufferSize  = 1000
+	topic       = "user-comment"
 )
 
 func main() {
@@ -41,15 +42,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
 	stats := services.NewStatsQuerier(db)
 	rdb := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
+	defer rdb.Close()
+
 	leaderboard := services.NewLeaderboardQuerier(rdb)
 
 	consumer := services.NewKafkaConsumer(leaderboard, stats, db, rdb)
 	defer consumer.Close()
 
-	log.Println("consumer started, listening on topic:", "event")
+	log.Println("consumer started, listening on topic:", topic)
 	go consumer.ReadLoop(ctx, WorkerCount, BufferSize)
 
 	<-ctx.Done()

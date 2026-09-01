@@ -54,6 +54,7 @@ func CreateComment(kafka *services.KafkaProducer) gin.HandlerFunc {
 			Content:  commentText,
 			Username: username,
 		}
+
 		go func() {
 			if err := kafka.Produce(ctx, eventPayload); err != nil {
 				log.Printf("kafka comment produce error: %v", err)

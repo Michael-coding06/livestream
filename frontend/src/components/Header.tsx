@@ -1,22 +1,23 @@
-type HeaderProps = {
-  onGoHome: () => void;
-  inStudio: boolean;
-};
+import { useLocation, useNavigate } from "react-router-dom";
 
-export function Header({ onGoHome, inStudio }: HeaderProps) {
+export function Header() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isDashboard = location.pathname === "/dashboard" || location.pathname === "/";
+
   return (
     <header className="topbar">
-      <div className="brand" onClick={onGoHome} role="button" tabIndex={0}>
+      <div className="brand" onClick={() => navigate("/dashboard")} role="button" tabIndex={0}>
         <span className="brand-dot" />
         <span>LiveStream</span>
       </div>
 
       <nav className="topnav">
-        <button className={!inStudio ? "topnav-btn active" : "topnav-btn"} onClick={onGoHome}>
-          Home
-        </button>
-        <button className={inStudio ? "topnav-btn active" : "topnav-btn"} disabled>
-          Studio
+        <button
+          className={isDashboard ? "topnav-btn active" : "topnav-btn"}
+          onClick={() => navigate("/dashboard")}
+        >
+          Dashboard
         </button>
       </nav>
 

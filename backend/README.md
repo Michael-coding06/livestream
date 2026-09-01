@@ -59,4 +59,4 @@ Supported `type` values:
 - `gift`
 - `join`
 
-docker compose exec mysql mysql -uroot -p
+

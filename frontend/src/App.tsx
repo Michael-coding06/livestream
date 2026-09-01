@@ -1,35 +1,27 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { Header } from "./components/Header";
 import { useRooms } from "./hooks/useRooms";
-import { useStudioSession } from "./hooks/useStudioSession";
 import HomePage from "./pages/Home";
-import StudioPage from "./pages/Studio";
+import LivestreamRoomPage from "./pages/LivestreamRoom";
 import type { Room } from "./types";
 
-type Page =
-  | { name: "home" }
-  | { name: "studio"; roomId: number };
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 export default function App() {
-  const { rooms, loading, error, createRoom, updateRoom, roomMap } = useRooms();
-  const [page, setPage] = useState<Page>({ name: "home" });
-
+  const { rooms, loading, error, createRoom, updateRoom } = useRooms();
+  const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [roomName, setRoomName] = useState("");
   const [hostName, setHostName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
-
-  const activeRoom: Room | null = useMemo(() => {
-    if (page.name !== "studio") return null;
-    return roomMap.get(page.roomId) ?? null;
-  }, [page, roomMap]);
-
-  const studio = useStudioSession(activeRoom, updateRoom);
-
-  const openStudio = (room: Room) => setPage({ name: "studio", roomId: room.id });
-
-  const goHome = () => setPage({ name: "home" });
 
   const closeCreate = () => {
     setShowCreate(false);
@@ -38,7 +30,11 @@ export default function App() {
     setDescription("");
   };
 
-  const submitCreate = async (e: FormEvent) => {
+  const onOpenRoom = (room: Room) => {
+    navigate(`/livestream-room/${slugify(room.name)}`);
+  };
+
+  const submitRoomCreate = async (e: FormEvent) => {
     e.preventDefault();
     const name = roomName.trim();
     const host = hostName.trim();
@@ -49,7 +45,7 @@ export default function App() {
     try {
       const room = await createRoom(name, host, desc);
       closeCreate();
-      openStudio(room);
+      onOpenRoom(room);
     } catch (err) {
       console.error("Room creation failed", err);
     } finally {
@@ -59,49 +55,37 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header onGoHome={goHome} inStudio={page.name === "studio"} />
+      <Header />
 
-      {page.name === "home" ? (
-        <HomePage
-          rooms={rooms}
-          loading={loading}
-          error={error}
-          showCreate={showCreate}
-          roomName={roomName}
-          hostName={hostName}
-          description={description}
-          creating={creating}
-          onOpenCreate={() => setShowCreate(true)}
-          onCloseCreate={closeCreate}
-          onRoomNameChange={setRoomName}
-          onHostNameChange={setHostName}
-          onDescriptionChange={setDescription}
-          onSubmitCreate={submitCreate}
-          onOpenStudio={openStudio}
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            <HomePage
+              rooms={rooms}
+              loading={loading}
+              error={error}
+              showCreate={showCreate}
+              roomName={roomName}
+              hostName={hostName}
+              description={description}
+              creating={creating}
+              onOpenCreate={() => setShowCreate(true)}
+              onCloseCreate={closeCreate}
+              onRoomNameChange={setRoomName}
+              onHostNameChange={setHostName}
+              onDescriptionChange={setDescription}
+              onSubmitRoomCreate={submitRoomCreate}
+              onOpenStudio={onOpenRoom}
+            />
+          }
         />
-      ) : null}
-
-      {page.name === "studio" && activeRoom ? (
-        <StudioPage
-          room={activeRoom}
-          isLive={studio.isLive}
-          duration={studio.duration}
-          viewerCount={studio.viewerCount}
-          copied={studio.copied}
-          busy={studio.busy}
-          chatInput={studio.chatInput}
-          username={studio.username}
-          chatMessages={studio.chatMessages}
-          onGoHome={goHome}
-          onGoLive={studio.goLive}
-          onEndLive={studio.endLive}
-          onCopyLink={studio.copyLink}
-          onChatInputChange={studio.setChatInput}
-          onUsernameChange={studio.setUsername}
-          onSendChat={studio.submitChat}
-          onSendGift={studio.sendGift}
+        <Route
+          path="/livestream-room/:roomSlug"
+          element={<LivestreamRoomPage rooms={rooms} onUpdateRoom={updateRoom} />}
         />
-      ) : null}
+      </Routes>
     </div>
   );
 }

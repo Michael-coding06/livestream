@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
+
+	// "strconv"
 	"time"
 
 	event "streampulse/models"
@@ -17,7 +18,7 @@ import (
 
 const (
 	brokerAddress = "localhost:9092"
-	topic         = "event"
+	topic         = "user-comment"
 	// groupID    = "event-group-1"
 )
 
@@ -50,7 +51,7 @@ func (k *KafkaProducer) Produce(ctx context.Context, e event.EventPayload) error
 	}
 
 	return k.writer.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(strconv.Itoa(e.RoomID)),
+		// Key:   []byte(strconv.Itoa(e.RoomID)), No need key for LeastBytes balancer
 		Value: data,
 	})
 }
@@ -66,10 +67,11 @@ type KafkaConsumer struct {
 func NewKafkaConsumer(leaderboard *LeaderboardQuerier, stats *StatsQuerier, db *sql.DB, rdb *redis.Client) *KafkaConsumer {
 	return &KafkaConsumer{
 		reader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers: []string{brokerAddress},
-			Topic:   topic,
-			GroupID: "event-group-1",
-			MaxWait: 100 * time.Millisecond, // wait for the at most 0.1s
+			Brokers:     []string{brokerAddress},
+			Topic:       topic,
+			GroupID:     "debug-event-group-1",
+			StartOffset: kafka.FirstOffset,
+			MaxWait:     100 * time.Millisecond, // wait for the at most 0.1s
 
 		}),
 		leaderboard: leaderboard,
@@ -107,58 +109,62 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context, workerCount int, bufferSiz
 		}
 
 		// push the message into the channel, the workers will handle the later logic
+		log.Printf("Attempting to push message to jobs channel...")
 		jobs <- msg
+		log.Printf("Successfully pushed message to jobs channel!")
 	}
 }
 
 func (k *KafkaConsumer) worker(ctx context.Context, workerID int, jobs <-chan kafka.Message) {
 	for msg := range jobs {
 		var e event.EventPayload
-		// convert raw Json data to Go data
 		if err := json.Unmarshal(msg.Value, &e); err != nil {
 			log.Printf("unmarshal error (offset %d): %v\n", msg.Offset, err)
 			continue
 		}
 
-		fmt.Printf("Worker [%d] received an event: %s\n", workerID, e.Type)
-		// go k.stats.UpdateStats(e)
-		switch e.Type {
-		case "gift":
-			// Update leaderboard using gift.GiftValue
-			k.leaderboard.UpdateLeaderboard(ctx, e, e.GiftValue)
+		// If MySQL or Redis takes longer than 5s, the context cancels and frees the worker!
+		msgCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		func() {
+			defer cancel()
 
-		case "comment":
-			// Save comment into MySQL
-			_, err := k.db.ExecContext(ctx, `
-                INSERT INTO comments (room_id, user_id, content)
-                VALUES (?, ?, ?)
-            `, e.RoomID, e.UserID, e.Content)
+			fmt.Printf("Worker [%d] received an event: %s\n", workerID, e.Type)
+			// go k.stats.UpdateStats(e)
+			switch e.Type {
+			case "gift":
+				// Update leaderboard using gift.GiftValue
+				k.leaderboard.UpdateLeaderboard(msgCtx, e, e.GiftValue)
 
-			if err != nil {
-				log.Printf("failed to insert comment into DB: %v", err)
-				continue
+			case "comment":
+				_, err := k.db.ExecContext(msgCtx, `
+                INSERT INTO comments (room_id, user_id, content, user_name)
+                VALUES (?, ?, ?, ?)
+            `, e.RoomID, e.UserID, e.Content, e.Username)
+				if err != nil {
+					log.Printf("failed to insert comment into DB: %v", err)
+					return
+				}
+
+				commentJSON, err := json.Marshal(e)
+				listKey := fmt.Sprintf("room:%d:comments", e.RoomID)
+
+				pipe := k.rdb.Pipeline()
+				pipe.LPush(msgCtx, listKey, commentJSON)
+				pipe.LTrim(msgCtx, listKey, 0, 9)
+				pipe.Expire(msgCtx, listKey, 24*time.Hour)
+
+				if _, err := pipe.Exec(msgCtx); err != nil {
+					log.Printf("failed to update redis comments list: %v", err)
+				}
+
+				pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
+				if err := k.rdb.Publish(msgCtx, pubsubChannel, commentJSON).Err(); err != nil {
+					log.Printf("failed to publish comment to pub/sub: %v", err)
+				}
+
+			default:
+				log.Printf("unknown event type received: %s", e.Type)
 			}
-
-			commentJSON, err := json.Marshal(e)
-			listKey := fmt.Sprintf("room:%d:comments", e.RoomID)
-
-			// Use a pipeline to send LPush, LTrim, and Expire in exactly ONE network request
-			pipe := k.rdb.Pipeline()
-			pipe.LPush(ctx, listKey, commentJSON)
-			pipe.LTrim(ctx, listKey, 0, 9)          // Keep only index 0 to 9 (10 comments)
-			pipe.Expire(ctx, listKey, 24*time.Hour) // Auto-delete room data after 24h
-
-			if _, err := pipe.Exec(ctx); err != nil {
-				log.Printf("failed to update redis comments list: %v", err)
-			}
-
-			pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
-			if err := k.rdb.Publish(ctx, pubsubChannel, commentJSON).Err(); err != nil {
-				log.Printf("failed to publish comment to pub/sub: %v", err)
-			}
-
-		default:
-			log.Printf("unknown event type received: %s", e.Type)
-		}
+		}()
 	}
 }

@@ -16,7 +16,7 @@ type HomePageProps = {
   onRoomNameChange: (v: string) => void;
   onHostNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
-  onSubmitCreate: (e: FormEvent) => void;
+  onSubmitRoomCreate: (e: FormEvent) => void;
   onOpenStudio: (room: Room) => void;
 };
 
@@ -70,7 +70,7 @@ export default function HomePage(props: HomePageProps) {
         <div className="modal-backdrop" onClick={props.onCloseCreate}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Create Room</h2>
-            <form onSubmit={props.onSubmitCreate} className="form-col">
+            <form onSubmit={props.onSubmitRoomCreate} className="form-col">
               <input
                 value={props.roomName}
                 onChange={(e) => props.onRoomNameChange(e.target.value)}

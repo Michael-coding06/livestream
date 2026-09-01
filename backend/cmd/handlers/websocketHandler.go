@@ -65,7 +65,7 @@ func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
 		// Phase 3: The Connection Loops
 		// --------------------------------------------------------
 
-		// We need a background goroutine to detect if the user closes their browser tab.
+		// We need a background gorouti+ne to detect if the user closes their browser tab.
 		// If we don't read from the connection, we won't know they left.
 		clientGone := make(chan struct{})
 		go func() {
@@ -85,14 +85,12 @@ func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
 			select {
 			case msg := <-redisLiveStream:
 				// A new comment arrived in Redis! Send it to this user's browser.
-				go func() {
-					err := conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
-					log.Printf("new comment arrived")
-					if err != nil {
-						log.Printf("Failed to push live message: %v", err)
-						return // Exit the loop and close connection
-					}
-				}()
+				err := conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
+				log.Printf("new comment arrived")
+				if err != nil {
+					log.Printf("Failed to push live message: %v", err)
+					return // Exit the loop and close connection
+				}
 
 			case <-clientGone:
 				// The background goroutine detected the user closed the tab

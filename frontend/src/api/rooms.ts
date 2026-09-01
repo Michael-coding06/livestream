@@ -30,5 +30,7 @@ export async function createRoom(payload: RoomPayload): Promise<Room> {
     name: payload.name,
     host: payload.host,
   });
-  return mapRoom(res.data?.room ?? {});
+
+  const room = res.data?.room ?? {};
+  return mapRoom(room);
 }
