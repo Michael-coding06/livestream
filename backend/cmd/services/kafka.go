@@ -6,8 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-
-	// "strconv"
+	"os"
 	"time"
 
 	event "streampulse/models"
@@ -17,10 +16,16 @@ import (
 )
 
 const (
-	brokerAddress = "localhost:9092"
-	topic         = "user-comment"
+	topic = "user-comment"
 	// groupID    = "event-group-1"
 )
+
+func brokerAddress() string {
+	if address := os.Getenv("KAFKA_BROKER"); address != "" {
+		return address
+	}
+	return "localhost:9092"
+}
 
 type KafkaProducer struct {
 	writer *kafka.Writer
@@ -29,7 +34,7 @@ type KafkaProducer struct {
 func NewKafkaProducer() *KafkaProducer {
 	return &KafkaProducer{
 		writer: &kafka.Writer{
-			Addr:         kafka.TCP(brokerAddress),
+			Addr:         kafka.TCP(brokerAddress()),
 			Topic:        topic,
 			Balancer:     &kafka.LeastBytes{},
 			BatchTimeout: 100 * time.Millisecond,
@@ -67,7 +72,7 @@ type KafkaConsumer struct {
 func NewKafkaConsumer(leaderboard *LeaderboardQuerier, stats *StatsQuerier, db *sql.DB, rdb *redis.Client) *KafkaConsumer {
 	return &KafkaConsumer{
 		reader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers:     []string{brokerAddress},
+			Brokers:     []string{brokerAddress()},
 			Topic:       topic,
 			GroupID:     "debug-event-group-1",
 			StartOffset: kafka.FirstOffset,
@@ -123,7 +128,7 @@ func (k *KafkaConsumer) worker(ctx context.Context, workerID int, jobs <-chan ka
 			continue
 		}
 
-		// If MySQL or Redis takes longer than 5s, the context cancels and frees the worker!
+		// If Redis takes longer than 5s, the context cancels and frees the worker!
 		msgCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		func() {
 			defer cancel()
@@ -136,16 +141,11 @@ func (k *KafkaConsumer) worker(ctx context.Context, workerID int, jobs <-chan ka
 				k.leaderboard.UpdateLeaderboard(msgCtx, e, e.GiftValue)
 
 			case "comment":
-				_, err := k.db.ExecContext(msgCtx, `
-                INSERT INTO comments (room_id, user_id, content, user_name)
-                VALUES (?, ?, ?, ?)
-            `, e.RoomID, e.UserID, e.Content, e.Username)
+				commentJSON, err := json.Marshal(e)
 				if err != nil {
-					log.Printf("failed to insert comment into DB: %v", err)
+					log.Printf("failed to convert comment into JSON: %v", err)
 					return
 				}
-
-				commentJSON, err := json.Marshal(e)
 				listKey := fmt.Sprintf("room:%d:comments", e.RoomID)
 
 				pipe := k.rdb.Pipeline()

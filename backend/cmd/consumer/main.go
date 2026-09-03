@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	WorkerCount = 10
+	WorkerCount = 20
 	BufferSize  = 1000
 	topic       = "user-comment"
 )

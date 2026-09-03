@@ -103,6 +103,7 @@ func SendFlower(db *sql.DB, kafka *services.KafkaProducer) gin.HandlerFunc {
 			GiftValue: giftValue,
 			Content:   "",
 		}
+		
 		go func() {
 			if err := kafka.Produce(ctx, eventPayload); err != nil {
 				log.Printf("kafka gift produce error: %v", err)
