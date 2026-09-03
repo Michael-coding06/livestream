@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStudioSession } from "../hooks/useStudioSession";
 import type { Room } from "../types";
 import StudioPage from "./Studio";
@@ -8,18 +8,14 @@ type LivestreamRoomPageProps = {
   onUpdateRoom: (roomId: number, patch: Partial<Room>) => void;
 };
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export default function LivestreamRoomPage({ rooms, onUpdateRoom }: LivestreamRoomPageProps) {
   const navigate = useNavigate();
-  const { roomSlug } = useParams();
-  const room = rooms.find((entry) => slugify(entry.name) === roomSlug) ?? null;
+  const [searchParams] = useSearchParams();
+  const roomIdParam = searchParams.get("roomId");
+  const roomId = roomIdParam ? Number(roomIdParam) : NaN;
+  const room = Number.isInteger(roomId)
+    ? rooms.find((entry) => entry.id === roomId) ?? null
+    : null;
   const studio = useStudioSession(room, onUpdateRoom);
 
   if (!room) {

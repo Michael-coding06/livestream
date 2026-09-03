@@ -84,9 +84,10 @@ func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
 		for {
 			select {
 			case msg := <-redisLiveStream:
+				log.Printf("new comment arrived")
+
 				// A new comment arrived in Redis! Send it to this user's browser.
 				err := conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
-				log.Printf("new comment arrived")
 				if err != nil {
 					log.Printf("Failed to push live message: %v", err)
 					return // Exit the loop and close connection

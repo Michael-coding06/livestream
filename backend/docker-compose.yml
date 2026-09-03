@@ -25,11 +25,9 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    command: >-
-      bash -c '/opt/kafka/bin/kafka-topics.sh
-      --bootstrap-server kafka:9092
-      --create --if-not-exists --topic user-comment
-      --partitions 1 --replication-factor 1'
+    command: ["bash", "/kafka-init.sh"]
+    volumes:
+      - ./kafka-init.sh:/kafka-init.sh:ro
   mysql:
     image: mysql:8
     ports:

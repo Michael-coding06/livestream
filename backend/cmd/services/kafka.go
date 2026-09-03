@@ -114,9 +114,7 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context, workerCount int, bufferSiz
 		}
 
 		// push the message into the channel, the workers will handle the later logic
-		log.Printf("Attempting to push message to jobs channel...")
 		jobs <- msg
-		log.Printf("Successfully pushed message to jobs channel!")
 	}
 }
 

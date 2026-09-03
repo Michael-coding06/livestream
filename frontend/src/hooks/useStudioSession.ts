@@ -20,14 +20,6 @@ function normalizeText(v: string) {
   return v.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function roomSlug(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 type WsCommentPayload = {
   room_id?: number;
   user_id?: number;
@@ -212,7 +204,7 @@ export function useStudioSession(
 
   const copyLink = useCallback(async () => {
     if (!room) return;
-    const path = `/${roomSlug(room.name || "room")}`;
+    const path = `/livestream-room?roomId=${room.id}`;
     const url = `${window.location.origin}${path}`;
 
     try {

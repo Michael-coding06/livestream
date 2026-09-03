@@ -6,14 +6,6 @@ import HomePage from "./pages/Home";
 import LivestreamRoomPage from "./pages/LivestreamRoom";
 import type { Room } from "./types";
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export default function App() {
   const { rooms, loading, error, createRoom, updateRoom } = useRooms();
   const navigate = useNavigate();
@@ -31,7 +23,7 @@ export default function App() {
   };
 
   const onOpenRoom = (room: Room) => {
-    navigate(`/livestream-room/${slugify(room.name)}`);
+    navigate(`/livestream-room?roomId=${room.id}`);
   };
 
   const submitRoomCreate = async (e: FormEvent) => {
@@ -82,7 +74,7 @@ export default function App() {
           }
         />
         <Route
-          path="/livestream-room/:roomSlug"
+          path="/livestream-room"
           element={<LivestreamRoomPage rooms={rooms} onUpdateRoom={updateRoom} />}
         />
       </Routes>
