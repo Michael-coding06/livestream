@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"streampulse/cmd/services"
@@ -128,7 +129,13 @@ func GetRoomStats(stats *services.StatsQuerier) gin.HandlerFunc {
 
 func GetRoomLeaderboard(leaderboard *services.LeaderboardQuerier) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		users, err := leaderboard.GetTopUsers(context.Background(), c.Param("room_id"))
+		roomID, err := strconv.Atoi(c.Param("room_id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room_id"})
+			return
+		}
+
+		users, err := leaderboard.GetTopUsers(context.Background(), roomID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read leaderboard"})
 			return

@@ -7,7 +7,7 @@ type EventPayload struct {
 	Type      string `json:"type"`
 	GiftValue int    `json:"gift_value"`
 	Content   string `json:"content"`
-	Username  string `json:"username"`
+	UserName  string `json:"username"`
 }
 
 type CommentPayload struct {

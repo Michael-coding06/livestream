@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import useCreateComment from "../api/useCreateComment";
 import useSendFlower from "../api/useSendFlower";
 import type { ChatMessage, Room } from "../types";
+import type { DonationNotice } from "./useLiveRoom";
 
 const AUTO_USERS = ["alex_dev", "maria_s", "coder99", "sophie_k", "techguru42"];
 const AUTO_TEXT = [
@@ -21,12 +22,22 @@ function normalizeText(v: string) {
 }
 
 type WsCommentPayload = {
+  type?: string;
   room_id?: number;
   user_id?: number;
   username?: string;
   content?: string;
   comment?: string;
-  type?: string;
+  commentJSON?: {
+    room_id?: number;
+    user_id?: number;
+    username?: string;
+    content?: string;
+    comment?: string;
+  };
+  leaderboard?: Array<{ Member: string; Score: number }>;
+  donor?: string;
+  gift_value?: number;
 };
 
 export function useStudioSession(
@@ -40,6 +51,8 @@ export function useStudioSession(
   const [duration, setDuration] = useState(0);
   const [viewerCount, setViewerCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [leaderboard, setLeaderboard] = useState<WsCommentPayload["leaderboard"]>([]);
+  const [donationNotice, setDonationNotice] = useState<DonationNotice | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [username, setUsername] = useState("you");
   const [copied, setCopied] = useState(false);
@@ -68,11 +81,13 @@ export function useStudioSession(
     setDuration(0);
     setViewerCount(0);
     setChatMessages([]);
+    setLeaderboard([]);
+    setDonationNotice(null);
     setChatInput("");
     recentFingerprintsRef.current.clear();
     pendingMineRef.current.clear();
 
-    const ws = new WebSocket(`ws://localhost:8087/ws/comments/${room.id}`);
+    const ws = new WebSocket(`ws://localhost:8087/ws/room/${room.id}`);
 
     console.log("roomid: ", room.id)
 
@@ -87,11 +102,31 @@ export function useStudioSession(
         console.log("there's a new event: ", event)
         const payload: WsCommentPayload = JSON.parse(event.data);
 
-        const text = (payload.content ?? payload.comment ?? "").trim();
+        switch (payload.type) {
+          case "comment":
+            break;
+
+          case "leaderboard-update":
+            setLeaderboard(payload.leaderboard ?? []);
+            if (payload.donor) {
+              setDonationNotice({
+                id: makeId(),
+                userName: payload.donor,
+                value: payload.gift_value ?? 0,
+              });
+            }
+            break;
+
+          default:
+            console.warn("Unknown event type:", payload.type);
+        }
+
+        const comment = payload.commentJSON ?? payload;
+        const text = (comment.content ?? comment.comment ?? "").trim();
         if (!text) return;
 
-        const user = payload.username?.trim() || (payload.user_id != null ? String(payload.user_id) : "randomUser");
-        const roomToken = String(payload.room_id ?? room.id);
+        const user = comment.username?.trim() || (comment.user_id != null ? String(comment.user_id) : "randomUser");
+        const roomToken = String(comment.room_id ?? room.id);
         const fp = `${roomToken}|${user}|${normalizeText(text)}`;
 
         // 1) Drop duplicates from history/live replay
@@ -141,6 +176,12 @@ export function useStudioSession(
       wsRef.current = null;
     };
   }, [room?.id, pushChatMessage]);
+
+  useEffect(() => {
+    if (!donationNotice) return;
+    const timeoutId = window.setTimeout(() => setDonationNotice(null), 3500);
+    return () => window.clearTimeout(timeoutId);
+  }, [donationNotice]);
 
   useEffect(() => {
     if (!isLive) return;
@@ -243,7 +284,7 @@ export function useStudioSession(
     if (!room || busy) return;
     setBusy(true);
     try {
-      await sendFlower(room.id, count);
+      await sendFlower(room.id, count, username);
     } catch (err) {
       console.error("Failed to send flower", err);
     } finally {
@@ -256,6 +297,8 @@ export function useStudioSession(
     duration,
     viewerCount,
     chatMessages,
+    leaderboard: leaderboard ?? [],
+    donationNotice,
     chatInput,
     username,
     copied,

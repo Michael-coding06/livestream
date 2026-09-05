@@ -37,18 +37,29 @@ func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
 		// --------------------------------------------------------
 		// Phase 1: Fetch and send the chat history (Hot Storage)
 		// --------------------------------------------------------
-		listKey := fmt.Sprintf("room:%s:comments", roomID)
+
+		// read the history messages list
+		commentListKey := fmt.Sprintf("room:%s:comments", roomID)
 
 		// Fetch all items from the list (0 to -1 means all items)
-		history, err := rdb.LRange(ctx, listKey, 0, -1).Result()
-		if err == nil && len(history) > 0 {
+		historyComments, err := rdb.LRange(ctx, commentListKey, 0, -1).Result()
+		if err == nil && len(historyComments) > 0 {
 			// Because we used LPUSH, the newest messages are at index 0.
 			// We iterate backward to send the oldest messages first so they appear in correct order.
-			for i := len(history) - 1; i >= 0; i-- {
-				if err := conn.WriteMessage(websocket.TextMessage, []byte(history[i])); err != nil {
+			for i := len(historyComments) - 1; i >= 0; i-- {
+				if err := conn.WriteMessage(websocket.TextMessage, []byte(historyComments[i])); err != nil {
 					log.Printf("Error sending history: %v", err)
 					return // Stop if the user disconnected immediately
 				}
+			}
+		}
+
+		donationListKey := fmt.Sprintf("room:%s:donations", roomID)
+		leaderboard, err := rdb.LRange(ctx, donationListKey, 0, -1).Result()
+		if err == nil && len(leaderboard) > 0 {
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(leaderboard[0])); err != nil {
+				log.Printf("Error sending history: %v", err)
+				return // Stop if the user disconnected immediately
 			}
 		}
 
@@ -84,7 +95,7 @@ func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
 		for {
 			select {
 			case msg := <-redisLiveStream:
-				log.Printf("new comment arrived")
+				log.Printf("new message arrived")
 
 				// A new comment arrived in Redis! Send it to this user's browser.
 				err := conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload))

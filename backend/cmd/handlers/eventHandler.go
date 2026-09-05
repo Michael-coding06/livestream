@@ -20,10 +20,10 @@ type createCommentRequest struct {
 }
 
 type sendGiftRequest struct {
-	RoomID    int `json:"roomID"`
-	UserID    int `json:"user_id"`
-	Count     int `json:"count"`
-	GiftValue int `json:"gift_value"`
+	RoomID    int    `json:"roomID"`
+	UserName  string `json:"user_name"`
+	Count     int    `json:"count"`
+	GiftValue int    `json:"gift_value"`
 }
 
 func CreateComment(kafka *services.KafkaProducer) gin.HandlerFunc {
@@ -52,7 +52,7 @@ func CreateComment(kafka *services.KafkaProducer) gin.HandlerFunc {
 			UserID:   userID,
 			Type:     "comment",
 			Content:  commentText,
-			Username: username,
+			UserName: username,
 		}
 
 		go func() {
@@ -79,7 +79,11 @@ func SendFlower(db *sql.DB, kafka *services.KafkaProducer) gin.HandlerFunc {
 		}
 
 		roomID := req.RoomID
-		userID := req.UserID
+		userName := strings.TrimSpace(req.UserName)
+		if roomID <= 0 || userName == "" {
+			c.JSON(400, gin.H{"error": "roomID and user_name are required"})
+			return
+		}
 		giftValue := req.GiftValue
 		if giftValue <= 0 {
 			giftValue = req.Count
@@ -88,27 +92,33 @@ func SendFlower(db *sql.DB, kafka *services.KafkaProducer) gin.HandlerFunc {
 			giftValue = 1
 		}
 
+		// Fake cash handler / cash api
+		log.Printf("Cash handler on processing donation on room: %d, by user: %s, count: %d\n", roomID, userName, giftValue)
+		log.Printf("Donation handler successfully")
+
 		if _, err := db.Exec(`
-			INSERT INTO events (room_id, user_id, type, gift_value)
+			INSERT INTO events (room_id, user_name, type, gift_value)
 			VALUES (?, ?, 'gift', ?)
-		`, roomID, userID, giftValue); err != nil {
+		`, roomID, userName, giftValue); err != nil {
 			c.JSON(500, gin.H{"error": "failed to send gift"})
 			return
 		}
 
 		eventPayload := event.EventPayload{
 			RoomID:    roomID,
-			UserID:    userID,
+			UserName:  userName,
 			Type:      "gift",
 			GiftValue: giftValue,
 			Content:   "",
 		}
-		
-		go func() {
-			if err := kafka.Produce(ctx, eventPayload); err != nil {
-				log.Printf("kafka gift produce error: %v", err)
-			}
-		}()
+
+		if err := kafka.Produce(ctx, eventPayload); err != nil {
+			log.Printf("kafka gift produce error: %v", err)
+			c.JSON(500, gin.H{
+				"status": "donation_failed",
+			})
+			return
+		}
 
 		c.JSON(202, gin.H{
 			"status": "queued",

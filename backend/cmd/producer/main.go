@@ -67,7 +67,7 @@ func main() {
 	/*
 		WEBSOCKET ENDPOINTS
 	*/
-	r.GET("/ws/comments/:room_id", handlers.StreamChatWS(rdb))
+	r.GET("/ws/room/:room_id", handlers.StreamChatWS(rdb))
 
 	if err := r.Run(":8087"); err != nil {
 		panic(err)

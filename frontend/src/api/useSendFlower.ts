@@ -6,14 +6,15 @@ const useSendFlower = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sendFlower = async (roomID: number, count: number) => {
+  const sendFlower = async (roomID: number, count: number, userName: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const res = await api.post(`/flower/send?room_id=${roomID}`, {
+      const res = await api.post("/flower/send", {
+        roomID,
         count,
-        user_id: "guest",
+        user_name: userName,
         gift_value: count,
       });
       return res.data.flower;
@@ -22,10 +23,12 @@ const useSendFlower = () => {
         const errorMsg = error.response?.data?.error ?? "Flower send failed";
         setError(errorMsg);
         alert(errorMsg);
+        throw error;
       } else {
         const errorMsg = "Flower send failed";
         setError(errorMsg);
         alert(errorMsg);
+        throw error;
       }
     } finally {
       setLoading(false);

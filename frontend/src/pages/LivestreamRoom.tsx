@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useStudioSession } from "../hooks/useStudioSession";
 import type { Room } from "../types";
 import StudioPage from "./Studio";
@@ -10,8 +10,9 @@ type LivestreamRoomPageProps = {
 
 export default function LivestreamRoomPage({ rooms, onUpdateRoom }: LivestreamRoomPageProps) {
   const navigate = useNavigate();
+  const { roomId: pathRoomId } = useParams<{ roomId: string }>();
   const [searchParams] = useSearchParams();
-  const roomIdParam = searchParams.get("roomId");
+  const roomIdParam = pathRoomId ?? searchParams.get("roomId");
   const roomId = roomIdParam ? Number(roomIdParam) : NaN;
   const room = Number.isInteger(roomId)
     ? rooms.find((entry) => entry.id === roomId) ?? null
@@ -20,8 +21,13 @@ export default function LivestreamRoomPage({ rooms, onUpdateRoom }: LivestreamRo
 
   if (!room) {
     return (
-      <main className="page">
-        <p className="empty">Room not found.</p>
+      <main className="page unavailable-page">
+        <section className="unavailable-card" role="alert">
+          <span className="unavailable-icon" aria-hidden="true">!</span>
+          <h1>Room unavailable</h1>
+          <p>This livestream is no longer available or the room link is invalid.</p>
+          <button className="brand-btn" onClick={() => navigate("/dashboard")}>OK</button>
+        </section>
       </main>
     );
   }
@@ -37,6 +43,8 @@ export default function LivestreamRoomPage({ rooms, onUpdateRoom }: LivestreamRo
       chatInput={studio.chatInput}
       username={studio.username}
       chatMessages={studio.chatMessages}
+      leaderboard={studio.leaderboard}
+      donationNotice={studio.donationNotice}
       onGoHome={() => navigate("/dashboard")}
       onGoLive={studio.goLive}
       onEndLive={studio.endLive}

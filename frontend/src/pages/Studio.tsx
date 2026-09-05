@@ -1,6 +1,8 @@
 import type { FormEvent } from "react";
 import type { ChatMessage, Room } from "../types";
 import { formatDuration, formatNumber } from "../utils/format";
+import { LeaderboardPanel } from "../components/LeaderboardPanel";
+import type { DonationNotice } from "../hooks/useLiveRoom";
 
 type StudioPageProps = {
   room: Room;
@@ -12,6 +14,8 @@ type StudioPageProps = {
   chatInput: string;
   username: string;
   chatMessages: ChatMessage[];
+  leaderboard: Array<{ Member: string; Score: number }>;
+  donationNotice: DonationNotice | null;
   onGoHome: () => void;
   onGoLive: () => void;
   onEndLive: () => void;
@@ -51,6 +55,12 @@ export default function StudioPage(props: StudioPageProps) {
             <span className="pill">{formatDuration(props.duration)}</span>
           </div>
           <div className="video-placeholder">Camera Preview</div>
+          <LeaderboardPanel entries={props.leaderboard} />
+          {props.donationNotice ? (
+            <div className="donation-notice">
+              {props.donationNotice.userName} donated {props.donationNotice.value} flower{props.donationNotice.value === 1 ? "" : "s"}
+            </div>
+          ) : null}
           <div className="gift-row">
             <button onClick={() => props.onSendGift(1)} disabled={props.busy}>Send 1 flower</button>
             <button onClick={() => props.onSendGift(5)} disabled={props.busy}>Send 5 flowers</button>

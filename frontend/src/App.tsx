@@ -77,6 +77,10 @@ export default function App() {
           path="/livestream-room"
           element={<LivestreamRoomPage rooms={rooms} onUpdateRoom={updateRoom} />}
         />
+        <Route
+          path="/livestream-room/:roomId"
+          element={<LivestreamRoomPage rooms={rooms} onUpdateRoom={updateRoom} />}
+        />
       </Routes>
     </div>
   );

@@ -135,28 +135,64 @@ func (k *KafkaConsumer) worker(ctx context.Context, workerID int, jobs <-chan ka
 			// go k.stats.UpdateStats(e)
 			switch e.Type {
 			case "gift":
-				// Update leaderboard using gift.GiftValue
 				k.leaderboard.UpdateLeaderboard(msgCtx, e, e.GiftValue)
+				roomLeaderboard, err := k.leaderboard.GetTopUsers(msgCtx, e.RoomID)
+				if err != nil {
+					log.Printf("failed to fetch room's leaderboard: %v", err)
+					return
+				}
 
-			case "comment":
-				commentJSON, err := json.Marshal(e)
+				roomLeaderboardJSON, err := json.Marshal(map[string]interface{}{
+					"type":        "leaderboard-update",
+					"leaderboard": roomLeaderboard,
+					"donor":       e.UserName,
+					"gift_value":  e.GiftValue,
+				})
 				if err != nil {
 					log.Printf("failed to convert comment into JSON: %v", err)
 					return
 				}
+				listKey := fmt.Sprintf("room:%d:donations", e.RoomID)
+
+				pipe := k.rdb.Pipeline()
+				pipe.Del(msgCtx, listKey)
+				pipe.RPush(msgCtx, listKey, roomLeaderboardJSON)
+				pipe.Expire(msgCtx, listKey, 24*time.Hour)
+
+				if _, err := pipe.Exec(msgCtx); err != nil {
+					log.Printf("failed to update redis donations list: %v", err)
+				}
+
+				pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
+				if err := k.rdb.Publish(msgCtx, pubsubChannel, roomLeaderboardJSON).Err(); err != nil {
+					log.Printf("failed to publish comment to pub/sub: %v", err)
+				}
+
+			case "comment":
+				commentPayload, err := json.Marshal(map[string]interface{}{
+					"type":        "comment",
+					"commentJSON": e,
+				})
+				if err != nil {
+					log.Printf("failed to convert comment into JSON: %v", err)
+					return
+				}
+
+				// declare a list to store messages
 				listKey := fmt.Sprintf("room:%d:comments", e.RoomID)
 
 				pipe := k.rdb.Pipeline()
-				pipe.LPush(msgCtx, listKey, commentJSON)
+				pipe.LPush(msgCtx, listKey, commentPayload)
 				pipe.LTrim(msgCtx, listKey, 0, 9)
 				pipe.Expire(msgCtx, listKey, 24*time.Hour)
 
+				// send the new messgae (with commands to push, trim and live-time property) to redis to update redis list memory
 				if _, err := pipe.Exec(msgCtx); err != nil {
 					log.Printf("failed to update redis comments list: %v", err)
 				}
 
 				pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
-				if err := k.rdb.Publish(msgCtx, pubsubChannel, commentJSON).Err(); err != nil {
+				if err := k.rdb.Publish(msgCtx, pubsubChannel, commentPayload).Err(); err != nil {
 					log.Printf("failed to publish comment to pub/sub: %v", err)
 				}
 

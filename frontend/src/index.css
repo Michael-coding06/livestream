@@ -145,10 +145,65 @@ textarea {
   color: #fff;
 }
 
+.donation-notice {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #8b5a2b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px #4a2d1a33;
+}
+
 .empty,
 .error {
   font-size: 13px;
   margin: 14px 0;
+}
+
+.unavailable-page {
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+}
+
+.unavailable-card {
+  width: min(100%, 420px);
+  padding: 32px 24px;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  text-align: center;
+  background: #fff;
+}
+
+.unavailable-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin: 0 auto 12px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.unavailable-card h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.unavailable-card p {
+  margin: 8px 0 20px;
+  color: #71717a;
+  font-size: 14px;
 }
 
 .error {

@@ -3,6 +3,7 @@ import type { Room, RoomStats, GiftType } from "../types";
 import { GIFTS, fmtNum } from "../data";
 import { ChatOverlay } from "./ChatOverlay";
 import { GiftOverlay } from "./GiftOverlay";
+import { LeaderboardPanel } from "./LeaderboardPanel";
 import { useLiveRoom } from "../hooks/useLiveRoom";
 import useCreateComment from "../api/useCreateComment";
 import useSendFlower from "../api/useSendFlower";
@@ -38,7 +39,7 @@ function GiftChip({ gift, onSend }: { gift: GiftType; onSend: (g: GiftType) => v
 export function LiveRoom({ room, stats, onBack, onSendGift, onLike: _onLike, onComment }: LiveRoomProps) {
   const [commentText, setCommentText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const { messages, toasts, pushMessage, pushGiftToast } = useLiveRoom(room.id);
+  const { messages, toasts, leaderboard, donationNotice, pushGiftToast } = useLiveRoom(room.id);
   const { createComment } = useCreateComment();
   const { sendFlower } = useSendFlower();
 
@@ -48,19 +49,18 @@ export function LiveRoom({ room, stats, onBack, onSendGift, onLike: _onLike, onC
 
     try {
       await createComment(text, room.id, "you");
-      pushMessage(text);
       onComment();
       setCommentText("");
       inputRef.current?.focus();
     } catch (error) {
       console.error("Failed to send comment:", error);
     }
-  }, [commentText, pushMessage, onComment, createComment, room.id]);
+  }, [commentText, onComment, createComment, room.id]);
 
   const handleSendGift = useCallback(async (gift: GiftType) => {
     const count = Math.floor(Math.random() * 4) + 1;
     try {
-      await sendFlower(room.id, count);
+      await sendFlower(room.id, count, "you");
       pushGiftToast(gift.emoji, gift.name, count);
       onSendGift(gift.cost, count);
     } catch (error) {
@@ -93,6 +93,26 @@ export function LiveRoom({ room, stats, onBack, onSendGift, onLike: _onLike, onC
 
         <ChatOverlay messages={messages} />
         <GiftOverlay toasts={toasts} />
+        <LeaderboardPanel entries={leaderboard} />
+        {donationNotice ? (
+          <div style={{
+            position: "absolute",
+            left: "50%",
+            top: 76,
+            transform: "translateX(-50%)",
+            padding: "8px 14px",
+            borderRadius: 999,
+            background: "#8b5a2b",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 700,
+            boxShadow: "0 8px 20px rgba(74,45,26,0.2)",
+            whiteSpace: "nowrap",
+            zIndex: 2,
+          }}>
+            {donationNotice.userName} donated {donationNotice.value} flower{donationNotice.value === 1 ? "" : "s"}
+          </div>
+        ) : null}
       </div>
 
       <div style={{ background: "#fffdf9", borderTop: "1px solid #e3d2bf", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>

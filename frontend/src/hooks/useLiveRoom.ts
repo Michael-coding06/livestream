@@ -5,9 +5,32 @@ import { uid } from "../data";
 const MAX_MESSAGES = 30;
 const MAX_TOASTS = 4;
 
+type LeaderboardEntry = { Member: string; Score: number };
+
+export type DonationNotice = {
+  id: string;
+  userName: string;
+  value: number;
+};
+
+type WsPayload = {
+  type?: string;
+  commentJSON?: {
+    username?: string;
+    user_id?: number;
+    content?: string;
+    comment?: string;
+  };
+  leaderboard?: LeaderboardEntry[];
+  donor?: string;
+  gift_value?: number;
+};
+
 export function useLiveRoom(roomId: number | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [toasts, setToasts] = useState<GiftToast[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [donationNotice, setDonationNotice] = useState<DonationNotice | null>(null);
   const activeRef = useRef(roomId);
   activeRef.current = roomId;
 
@@ -15,12 +38,54 @@ export function useLiveRoom(roomId: number | null) {
     if (roomId === null) return;
     setMessages([]);
     setToasts([]);
+    setLeaderboard([]);
+    setDonationNotice(null);
+
+    const ws = new WebSocket(`ws://localhost:8087/ws/room/${roomId}`);
+    ws.onmessage = (event) => {
+      try {
+        const payload: WsPayload = JSON.parse(event.data);
+
+        switch (payload.type) {
+          case "comment": {
+            const comment = payload.commentJSON;
+            const text = (comment?.content ?? comment?.comment ?? "").trim();
+            if (text) {
+              pushIncomingMessage(comment?.username || String(comment?.user_id ?? "anonymous"), text);
+            }
+            break;
+          }
+          case "leaderboard-update":
+            setLeaderboard(payload.leaderboard ?? []);
+            if (payload.donor) {
+              setDonationNotice({
+                id: uid(),
+                userName: payload.donor,
+                value: payload.gift_value ?? 0,
+              });
+            }
+            break;
+          default:
+            break;
+        }
+      } catch (error) {
+        console.error("Failed to parse room WebSocket message", error);
+      }
+    };
+
+    return () => ws.close();
   }, [roomId]);
 
-  const pushMessage = useCallback((text: string) => {
+  useEffect(() => {
+    if (!donationNotice) return;
+    const timeoutId = window.setTimeout(() => setDonationNotice(null), 3500);
+    return () => window.clearTimeout(timeoutId);
+  }, [donationNotice]);
+
+  const pushIncomingMessage = useCallback((user: string, text: string) => {
     const msg: ChatMessage = {
       id: uid(),
-      user: "@you",
+      user,
       text,
       color: "#7f77dd",
       timestamp: Date.now(),
@@ -36,5 +101,5 @@ export function useLiveRoom(roomId: number | null) {
     }, 3500);
   }, []);
 
-  return { messages, toasts, pushMessage, pushGiftToast };
+  return { messages, toasts, leaderboard, donationNotice, pushGiftToast };
 }
