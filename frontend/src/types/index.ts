@@ -53,3 +53,10 @@ export interface GiftToast {
   count: number;
   timestamp: number;
 }
+
+export interface LeaderboardEntry {
+  room_id: number;
+  user_id: number;
+  user_name: string;
+  donation_value: number;
+}

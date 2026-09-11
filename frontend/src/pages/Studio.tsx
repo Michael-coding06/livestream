@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import type { ChatMessage, Room } from "../types";
+import type { ChatMessage, LeaderboardEntry, Room } from "../types";
 import { formatDuration, formatNumber } from "../utils/format";
 import { LeaderboardPanel } from "../components/LeaderboardPanel";
 import type { DonationNotice } from "../hooks/useLiveRoom";
@@ -10,11 +10,12 @@ type StudioPageProps = {
   duration: number;
   viewerCount: number;
   copied: boolean;
-  busy: boolean;
+  commentBusy: boolean;
+  giftBusy: boolean;
   chatInput: string;
   username: string;
   chatMessages: ChatMessage[];
-  leaderboard: Array<{ Member: string; Score: number }>;
+  leaderboard: LeaderboardEntry[];
   donationNotice: DonationNotice | null;
   onGoHome: () => void;
   onGoLive: () => void;
@@ -62,9 +63,9 @@ export default function StudioPage(props: StudioPageProps) {
             </div>
           ) : null}
           <div className="gift-row">
-            <button onClick={() => props.onSendGift(1)} disabled={props.busy}>Send 1 flower</button>
-            <button onClick={() => props.onSendGift(5)} disabled={props.busy}>Send 5 flowers</button>
-            <button onClick={() => props.onSendGift(10)} disabled={props.busy}>Send 10 flowers</button>
+            <button onClick={() => props.onSendGift(1)} disabled={props.giftBusy}>Send 1 flower</button>
+            <button onClick={() => props.onSendGift(5)} disabled={props.giftBusy}>Send 5 flowers</button>
+            <button onClick={() => props.onSendGift(10)} disabled={props.giftBusy}>Send 10 flowers</button>
           </div>
         </article>
 
@@ -99,7 +100,7 @@ export default function StudioPage(props: StudioPageProps) {
               placeholder="Write a message"
               maxLength={120}
             />
-            <button type="submit" className="brand-btn" disabled={props.busy}>Send</button>
+            <button type="submit" className="brand-btn" disabled={props.commentBusy}>Send</button>
           </form>
         </aside>
       </section>

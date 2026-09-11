@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	l "streampulse/cmd/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -18,9 +21,14 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
+func StreamChatWS(rdb *redis.Client, leaderboard *l.LeaderboardQuerier) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roomID := c.Param("room_id")
+		roomIDInt, err := strconv.Atoi(roomID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room_id"})
+			return
+		}
 
 		log.Printf("roomId ows ows: %s", roomID)
 
@@ -54,12 +62,18 @@ func StreamChatWS(rdb *redis.Client) gin.HandlerFunc {
 			}
 		}
 
-		donationListKey := fmt.Sprintf("room:%s:donations", roomID)
-		leaderboard, err := rdb.LRange(ctx, donationListKey, 0, -1).Result()
-		if err == nil && len(leaderboard) > 0 {
-			if err := conn.WriteMessage(websocket.TextMessage, []byte(leaderboard[0])); err != nil {
-				log.Printf("Error sending history: %v", err)
-				return // Stop if the user disconnected immediately
+		initialLeaderboard, err := leaderboard.GetTopUsers(ctx, roomIDInt)
+		if err == nil && len(initialLeaderboard) > 0 {
+			leaderboardJSON, err := json.Marshal(map[string]interface{}{
+				"type":        "leaderboard-update",
+				"leaderboard": initialLeaderboard,
+			})
+
+			if err == nil {
+				if err := conn.WriteMessage(websocket.TextMessage, leaderboardJSON); err != nil {
+					log.Printf("Error sending history: %v", err)
+					return // Stop if the user disconnected immediately
+				}
 			}
 		}
 

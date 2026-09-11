@@ -1,7 +1,4 @@
-export type LeaderboardEntry = {
-  Member: string;
-  Score: number;
-};
+import type { LeaderboardEntry } from "../types";
 
 interface LeaderboardPanelProps {
   entries: LeaderboardEntry[];
@@ -33,10 +30,10 @@ export function LeaderboardPanel({ entries }: LeaderboardPanelProps) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {visibleEntries.map((entry, index) => (
-            <div key={`${entry.Member}-${index}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+            <div key={`${entry.user_name}-${index}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
               <span style={{ width: 16, color: index < 3 ? "#b45309" : "#8b735f", fontWeight: 700 }}>{index + 1}</span>
-              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.Member}</span>
-              <span style={{ color: "#8b5a2b", fontWeight: 700 }}>{entry.Score}</span>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.user_name}</span>
+              <span style={{ color: "#8b5a2b", fontWeight: 700 }}>{entry.donation_value}</span>
             </div>
           ))}
         </div>

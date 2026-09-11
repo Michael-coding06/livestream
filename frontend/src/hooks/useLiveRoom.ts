@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ChatMessage, GiftToast } from "../types";
+import type { ChatMessage, GiftToast, LeaderboardEntry } from "../types";
 import { uid } from "../data";
 
 const MAX_MESSAGES = 30;
 const MAX_TOASTS = 4;
-
-type LeaderboardEntry = { Member: string; Score: number };
 
 export type DonationNotice = {
   id: string;
@@ -22,9 +20,30 @@ type WsPayload = {
     comment?: string;
   };
   leaderboard?: LeaderboardEntry[];
-  donor?: string;
-  gift_value?: number;
+  room_id?: number;
+  user_id?: number;
+  user_name?: string;
+  donation_value?: number;
 };
+
+function mergeGift(entries: LeaderboardEntry[], gift: WsPayload): LeaderboardEntry[] {
+  const userName = gift.user_name?.trim();
+  if (!userName) return entries;
+
+  const existing = entries.find((entry) => entry.user_name === userName);
+  const updated = existing
+    ? { ...existing, donation_value: existing.donation_value + (gift.donation_value ?? 0)}
+    : {
+        room_id: gift.room_id ?? 0,
+        user_id: gift.user_id ?? 0,
+        user_name: userName,
+        donation_value: gift.donation_value ?? 0,
+      };
+
+  return [...entries.filter((entry) => entry.user_name !== userName), updated]
+    .sort((a, b) => b.donation_value - a.donation_value)
+    .slice(0, 10);
+}
 
 export function useLiveRoom(roomId: number | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -55,16 +74,19 @@ export function useLiveRoom(roomId: number | null) {
             }
             break;
           }
-          case "leaderboard-update":
+          case "leaderboard-update": {
             setLeaderboard(payload.leaderboard ?? []);
-            if (payload.donor) {
-              setDonationNotice({
-                id: uid(),
-                userName: payload.donor,
-                value: payload.gift_value ?? 0,
-              });
-            }
             break;
+          }
+          case "gift": {
+            setLeaderboard((entries) => mergeGift(entries, payload));
+            setDonationNotice({
+              id: uid(),
+              userName: payload.user_name ?? "anonymous",
+              value: payload.donation_value ?? 0,
+            });
+            break;
+          }
           default:
             break;
         }

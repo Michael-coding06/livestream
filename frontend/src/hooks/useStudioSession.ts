@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import useCreateComment from "../api/useCreateComment";
 import useSendFlower from "../api/useSendFlower";
-import type { ChatMessage, Room } from "../types";
+import type { ChatMessage, LeaderboardEntry, Room } from "../types";
 import type { DonationNotice } from "./useLiveRoom";
 
 const AUTO_USERS = ["alex_dev", "maria_s", "coder99", "sophie_k", "techguru42"];
@@ -35,10 +35,29 @@ type WsCommentPayload = {
     content?: string;
     comment?: string;
   };
-  leaderboard?: Array<{ Member: string; Score: number }>;
-  donor?: string;
-  gift_value?: number;
+  leaderboard?: LeaderboardEntry[];
+  user_name?: string;
+  donation_value?: number;
 };
+
+function mergeGift(entries: LeaderboardEntry[], gift: WsCommentPayload): LeaderboardEntry[] {
+  const userName = gift.user_name?.trim();
+  if (!userName) return entries;
+
+  const existing = entries.find((entry) => entry.user_name === userName);
+  const updated = existing
+    ? { ...existing, donation_value: existing.donation_value + (gift.donation_value ?? 0)}
+    : {
+        room_id: gift.room_id ?? 0,
+        user_id: gift.user_id ?? 0,
+        user_name: userName,
+        donation_value: gift.donation_value ?? 0,
+      };
+
+  return [...entries.filter((entry) => entry.user_name !== userName), updated]
+    .sort((a, b) => b.donation_value - a.donation_value) // if b.donation_value > a.donation_value => swap(a,b)
+    .slice(0, 10);
+}
 
 export function useStudioSession(
   room: Room | null,
@@ -51,12 +70,13 @@ export function useStudioSession(
   const [duration, setDuration] = useState(0);
   const [viewerCount, setViewerCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [leaderboard, setLeaderboard] = useState<WsCommentPayload["leaderboard"]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [donationNotice, setDonationNotice] = useState<DonationNotice | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [username, setUsername] = useState("you");
   const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [giftBusy, setGiftBusy] = useState(false);
 
   const copyTimerRef = useRef<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -84,6 +104,8 @@ export function useStudioSession(
     setLeaderboard([]);
     setDonationNotice(null);
     setChatInput("");
+    setCommentBusy(false);
+    setGiftBusy(false);
     recentFingerprintsRef.current.clear();
     pendingMineRef.current.clear();
 
@@ -108,13 +130,15 @@ export function useStudioSession(
 
           case "leaderboard-update":
             setLeaderboard(payload.leaderboard ?? []);
-            if (payload.donor) {
-              setDonationNotice({
-                id: makeId(),
-                userName: payload.donor,
-                value: payload.gift_value ?? 0,
-              });
-            }
+            break;
+
+          case "gift":
+            setLeaderboard((entries) => mergeGift(entries, payload));
+            setDonationNotice({
+              id: makeId(),
+              userName: payload.user_name ?? "anonymous",
+              value: payload.donation_value ?? 0,
+            });
             break;
 
           default:
@@ -262,9 +286,9 @@ export function useStudioSession(
     if (!room) return;
     const text = chatInput.trim();
     const name = username.trim();
-    if (!text || !name || busy) return;
+    if (!text || !name || commentBusy) return;
 
-    setBusy(true);
+    setCommentBusy(true);
     try {
       const norm = normalizeText(text);
       pendingMineRef.current.add(norm);
@@ -276,21 +300,21 @@ export function useStudioSession(
       // Rollback optimistic marker only; message can remain as local feedback
       pendingMineRef.current.delete(normalizeText(text));
     } finally {
-      setBusy(false);
+      setCommentBusy(false);
     }
-  }, [busy, chatInput, createComment, room, pushChatMessage, username]);
+  }, [commentBusy, chatInput, createComment, room, username]);
 
   const sendGift = useCallback(async (count: number) => {
-    if (!room || busy) return;
-    setBusy(true);
+    if (!room || giftBusy) return;
+    setGiftBusy(true);
     try {
       await sendFlower(room.id, count, username);
     } catch (err) {
       console.error("Failed to send flower", err);
     } finally {
-      setBusy(false);
+      setGiftBusy(false);
     }
-  }, [busy, room, sendFlower]);
+  }, [giftBusy, room, sendFlower, username]);
 
   return {
     isLive,
@@ -302,7 +326,8 @@ export function useStudioSession(
     chatInput,
     username,
     copied,
-    busy,
+    commentBusy,
+    giftBusy,
     setChatInput,
     setUsername,
     goLive,

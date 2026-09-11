@@ -39,7 +39,8 @@ export default function LivestreamRoomPage({ rooms, onUpdateRoom }: LivestreamRo
       duration={studio.duration}
       viewerCount={studio.viewerCount}
       copied={studio.copied}
-      busy={studio.busy}
+      commentBusy={studio.commentBusy}
+      giftBusy={studio.giftBusy}
       chatInput={studio.chatInput}
       username={studio.username}
       chatMessages={studio.chatMessages}

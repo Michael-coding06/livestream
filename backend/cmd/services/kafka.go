@@ -92,6 +92,7 @@ func (k *KafkaConsumer) Close() error {
 
 // This is the function to keep pulling message from kafka, this will be made a goroutine in the main file
 func (k *KafkaConsumer) ReadLoop(ctx context.Context, workerCount int, bufferSize int) {
+	// create a go channel to store messages (chan in go has its own mutex lock to prevent race condition)
 	jobs := make(chan kafka.Message, bufferSize) // jobs channel can store at most 1000 messages
 
 	for i := 1; i <= workerCount; i++ {
@@ -132,39 +133,25 @@ func (k *KafkaConsumer) worker(ctx context.Context, workerID int, jobs <-chan ka
 			defer cancel()
 
 			fmt.Printf("Worker [%d] received an event: %s\n", workerID, e.Type)
-			// go k.stats.UpdateStats(e)
+
 			switch e.Type {
 			case "gift":
 				k.leaderboard.UpdateLeaderboard(msgCtx, e, e.GiftValue)
-				roomLeaderboard, err := k.leaderboard.GetTopUsers(msgCtx, e.RoomID)
-				if err != nil {
-					log.Printf("failed to fetch room's leaderboard: %v", err)
-					return
-				}
 
-				roomLeaderboardJSON, err := json.Marshal(map[string]interface{}{
-					"type":        "leaderboard-update",
-					"leaderboard": roomLeaderboard,
-					"donor":       e.UserName,
-					"gift_value":  e.GiftValue,
+				giftJSON, err := json.Marshal(map[string]interface{}{
+					"type":           "gift",
+					"room_id":        e.RoomID,
+					"user_id":        e.UserID,
+					"user_name":      e.UserName,
+					"donation_value": e.GiftValue,
 				})
 				if err != nil {
 					log.Printf("failed to convert comment into JSON: %v", err)
 					return
 				}
-				listKey := fmt.Sprintf("room:%d:donations", e.RoomID)
-
-				pipe := k.rdb.Pipeline()
-				pipe.Del(msgCtx, listKey)
-				pipe.RPush(msgCtx, listKey, roomLeaderboardJSON)
-				pipe.Expire(msgCtx, listKey, 24*time.Hour)
-
-				if _, err := pipe.Exec(msgCtx); err != nil {
-					log.Printf("failed to update redis donations list: %v", err)
-				}
 
 				pubsubChannel := fmt.Sprintf("room:%d:live", e.RoomID)
-				if err := k.rdb.Publish(msgCtx, pubsubChannel, roomLeaderboardJSON).Err(); err != nil {
+				if err := k.rdb.Publish(msgCtx, pubsubChannel, giftJSON).Err(); err != nil {
 					log.Printf("failed to publish comment to pub/sub: %v", err)
 				}
 
