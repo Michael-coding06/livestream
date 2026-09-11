@@ -121,3 +121,27 @@ docker compose logs --tail=100 consumer
 ```
 
 The producer has an HTTP health endpoint. Kafka and the consumer use connectivity, container status, and logs because they do not currently expose dedicated health endpoints.
+
+## Load Testing with k6
+
+This project uses [k6](https://grafana.com/docs/k6/latest/) for HTTP load and performance testing.
+
+### Install k6
+
+#### Ubuntu / WSL
+
+If you are using Ubuntu or WSL, install k6 with:
+
+```bash
+sudo gpg -k
+sudo apt-get update
+sudo apt-get install -y gnupg ca-certificates curl
+
+curl -s https://dl.k6.io/key.gpg | \
+    sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | \
+    sudo tee /etc/apt/sources.list.d/k6.list
+
+sudo apt-get update
+sudo apt-get install -y k6
