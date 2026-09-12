@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -30,8 +31,23 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
 	defer rdb.Close()
 
-	kafka := services.NewKafkaProducer()
-	defer kafka.Close()
+	// === Kafka Producers initialization ===
+	brokers := services.BrokerAddresses()
+
+	// Step 1: Ensure all topics exist on boot
+	if err := services.EnsureTopicsExist(brokers, services.AppTopics); err != nil {
+		log.Fatalf("Initialization failed: %v", err)
+	}
+
+	// Step 2: Print cluster topology and partition leaders
+	services.PrintKafkaClusterMap(brokers, services.AppTopics)
+
+	commentProducer := services.NewKafkaProducer("user-comment")
+	defer commentProducer.Close()
+
+	donationProducer := services.NewKafkaProducer("user-donation")
+	defer donationProducer.Close()
+	// ======================================
 
 	stats := services.NewStatsQuerier(db)
 	leaderboard := services.NewLeaderboardQuerier(rdb)
@@ -52,17 +68,17 @@ func main() {
 	/*
 		ROOM ENDPOINTS
 	*/
-	r.POST("/room/create", handlers.CreateRoom(db)) // events, but no need to push to Kafka now
+	r.POST("/room/create", handlers.CreateRoom(db))
 	r.GET("/rooms", handlers.GetRooms(db))
-	r.DELETE("/room/delete", handlers.DeleteRoom(db, rdb)) // events, but no need to push to Kafka now
+	r.DELETE("/room/delete", handlers.DeleteRoom(db, rdb))
 	r.GET("/rooms/:room_id/stats", handlers.GetRoomStats(stats))
 	r.GET("/rooms/:room_id/leaderboard", handlers.GetRoomLeaderboard(leaderboard))
 
 	/*
 		EVENTS ENDPOINTS: comments, donations,...
 	*/
-	r.POST("/comment/create", handlers.CreateComment(kafka))
-	r.POST("/flower/send", handlers.SendFlower(db, kafka))
+	r.POST("/comment/create", handlers.CreateComment(commentProducer))
+	r.POST("/flower/send", handlers.SendFlower(db, donationProducer))
 
 	/*
 		WEBSOCKET ENDPOINTS

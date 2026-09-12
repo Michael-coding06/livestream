@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	event "streampulse/models"
@@ -15,31 +17,135 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-const (
-	topic = "user-comment"
-	// groupID    = "event-group-1"
-)
+type TopicSpec struct {
+	Name              string
+	NumPartitions     int
+	ReplicationFactor int
+	MinInSyncReplicas string
+}
 
-func brokerAddress() string {
-	if address := os.Getenv("KAFKA_BROKER"); address != "" {
-		return address
+// Declare all application topics in a single slice
+var AppTopics = []TopicSpec{
+	{
+		Name:              "user-comment",
+		NumPartitions:     2,
+		ReplicationFactor: 2,
+		MinInSyncReplicas: "1",
+	},
+	{
+		Name:              "user-donation",
+		NumPartitions:     3,
+		ReplicationFactor: 2,
+		MinInSyncReplicas: "1",
+	},
+}
+
+func BrokerAddresses() []string {
+	if addresses := os.Getenv("KAFKA_BROKER"); addresses != "" {
+		return strings.Split(addresses, ",")
 	}
-	return "localhost:9092"
+	return []string{"localhost:9092", "localhost:9093"} // default broker addresses
 }
 
 type KafkaProducer struct {
 	writer *kafka.Writer
 }
 
-func NewKafkaProducer() *KafkaProducer {
+func EnsureTopicsExist(brokers []string, specs []TopicSpec) error {
+	client := &kafka.Client{
+		Addr:    kafka.TCP(brokers...),
+		Timeout: 10 * time.Second,
+	}
+
+	topicConfigs := make([]kafka.TopicConfig, len(specs))
+	for i, spec := range specs {
+		topicConfigs[i] = kafka.TopicConfig{
+			Topic:             spec.Name,
+			NumPartitions:     spec.NumPartitions,
+			ReplicationFactor: spec.ReplicationFactor,
+			ConfigEntries: []kafka.ConfigEntry{
+				{
+					ConfigName:  "min.insync.replicas",
+					ConfigValue: spec.MinInSyncReplicas,
+				},
+			},
+		}
+	}
+
+	resp, err := client.CreateTopics(context.Background(), &kafka.CreateTopicsRequest{
+		Topics: topicConfigs,
+	})
+	if err != nil {
+		return err
+	}
+
+	for topicName, topicErr := range resp.Errors {
+		if topicErr != nil {
+			if errors.Is(topicErr, kafka.TopicAlreadyExists) {
+				log.Printf("Topic %q already exists. Skipping.", topicName)
+				continue
+			}
+			log.Printf("Failed to create topic %q: %v", topicName, topicErr)
+			return topicErr
+		}
+		log.Printf("Successfully declared topic %q", topicName)
+	}
+
+	return nil
+}
+
+// debug function
+func PrintKafkaClusterMap(brokers []string, topics []TopicSpec) {
+	client := &kafka.Client{
+		Addr:    kafka.TCP(brokers...),
+		Timeout: 5 * time.Second,
+	}
+
+	// Extract topic names from []TopicSpec into []string
+	topicNames := make([]string, len(topics))
+	for i, t := range topics {
+		topicNames[i] = t.Name
+	}
+
+	resp, err := client.Metadata(context.Background(), &kafka.MetadataRequest{
+		Topics: topicNames,
+	})
+	if err != nil {
+		log.Fatalf("Failed to fetch metadata: %v", err)
+	}
+
+	fmt.Println("=== DISCOVERED BROKERS ===")
+	for _, b := range resp.Brokers {
+		fmt.Printf("• Broker ID %d: %s:%d\n", b.ID, b.Host, b.Port)
+	}
+
+	for _, t := range resp.Topics {
+		fmt.Printf("\n=== PARTITION MAP FOR TOPIC: %s ===\n", t.Name)
+		for _, p := range t.Partitions {
+			replicaIDs := []int{}
+			for _, r := range p.Replicas {
+				replicaIDs = append(replicaIDs, r.ID)
+			}
+			isrIDs := []int{}
+			for _, isr := range p.Isr {
+				isrIDs = append(isrIDs, isr.ID)
+			}
+
+			fmt.Printf("• Partition [%d] -> Leader: Broker %d | Replicas: %v | In-Sync Replicas: %v\n",
+				p.ID, p.Leader.ID, replicaIDs, isrIDs)
+		}
+	}
+}
+
+func NewKafkaProducer(topic string) *KafkaProducer {
 	return &KafkaProducer{
 		writer: &kafka.Writer{
-			Addr:         kafka.TCP(brokerAddress()),
+			Addr:         kafka.TCP(BrokerAddresses()...),
 			Topic:        topic,
 			Balancer:     &kafka.LeastBytes{},
+			RequiredAcks: kafka.RequireAll, // Ensures acks=all for replication_factor=2
 			BatchTimeout: 100 * time.Millisecond,
 			BatchSize:    100,
-			// AllowAutoTopicCreation: true,
 		},
 	}
 }
@@ -56,7 +162,6 @@ func (k *KafkaProducer) Produce(ctx context.Context, e event.EventPayload) error
 	}
 
 	return k.writer.WriteMessages(ctx, kafka.Message{
-		// Key:   []byte(strconv.Itoa(e.RoomID)), No need key for LeastBytes balancer
 		Value: data,
 	})
 }
@@ -69,12 +174,12 @@ type KafkaConsumer struct {
 	rdb         *redis.Client // <--- Add Redis connection
 }
 
-func NewKafkaConsumer(leaderboard *LeaderboardQuerier, stats *StatsQuerier, db *sql.DB, rdb *redis.Client) *KafkaConsumer {
+func NewKafkaConsumer(leaderboard *LeaderboardQuerier, stats *StatsQuerier, db *sql.DB, rdb *redis.Client, topic string, groupID string) *KafkaConsumer {
 	return &KafkaConsumer{
 		reader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers:     []string{brokerAddress()},
+			Brokers:     BrokerAddresses(),
 			Topic:       topic,
-			GroupID:     "debug-event-group-1",
+			GroupID:     groupID,
 			StartOffset: kafka.FirstOffset,
 			MaxWait:     100 * time.Millisecond, // wait for the at most 0.1s
 
@@ -93,7 +198,7 @@ func (k *KafkaConsumer) Close() error {
 // This is the function to keep pulling message from kafka, this will be made a goroutine in the main file
 func (k *KafkaConsumer) ReadLoop(ctx context.Context, workerCount int, bufferSize int) {
 	// create a go channel to store messages (chan in go has its own mutex lock to prevent race condition)
-	jobs := make(chan kafka.Message, bufferSize) // jobs channel can store at most 1000 messages
+	jobs := make(chan kafka.Message, bufferSize) // jobs channel can store at most 'bufferSize' messages
 
 	for i := 1; i <= workerCount; i++ {
 		go k.worker(ctx, i, jobs)
@@ -104,6 +209,7 @@ func (k *KafkaConsumer) ReadLoop(ctx context.Context, workerCount int, bufferSiz
 		case <-ctx.Done():
 			close(jobs)
 			return
+
 		default:
 		}
 

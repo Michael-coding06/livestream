@@ -20,7 +20,6 @@ import (
 const (
 	WorkerCount = 20
 	BufferSize  = 1000
-	topic       = "user-comment"
 )
 
 func main() {
@@ -50,12 +49,32 @@ func main() {
 
 	leaderboard := services.NewLeaderboardQuerier(rdb)
 
-	consumer := services.NewKafkaConsumer(leaderboard, stats, db, rdb)
-	defer consumer.Close()
+	// === Kafka Consumers initialization ===
+	commentConsumer := services.NewKafkaConsumer(leaderboard, stats, db, rdb, "user-comment", "cg-comments")
+	defer commentConsumer.Close()
 
-	log.Println("consumer started, listening on topic:", topic)
-	go consumer.ReadLoop(ctx, WorkerCount, BufferSize)
+	donationConsumer := services.NewKafkaConsumer(leaderboard, stats, db, rdb, "user-donation", "cg-donations")
+	defer donationConsumer.Close()
+	// ======================================
+
+	// var wg sync.WaitGroup
+	// wg.Add(2)
+
+	go func() {
+		// defer wg.Done()
+		log.Println("Consumer started, listening on topic: user-comment")
+		commentConsumer.ReadLoop(ctx, WorkerCount, BufferSize)
+	}()
+
+	go func() {
+		// defer wg.Done()
+		log.Println("Consumer started, listening on topic: user-donation")
+		donationConsumer.ReadLoop(ctx, WorkerCount, BufferSize)
+	}()
 
 	<-ctx.Done()
-	log.Println("consumer shutting down")
+	log.Println("Shutting down consumers...")
+
+	// wg.Wait()
+	log.Println("All consumers shut down successfully.")
 }
