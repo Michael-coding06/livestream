@@ -70,9 +70,48 @@ services:
     ports:
       - "6376:6379"
 
+  # api:
+  #   build: .
+  #   command: go run ./cmd/producer
+  #   ports:
+  #     - "8087:8087"
+  #   depends_on:
+  #     kafka-init:
+  #       condition: service_completed_successfully
+  #     mysql:
+  #       condition: service_started
+  #     redis:
+  #       condition: service_started
+  #   environment:
+  #     KAFKA_BROKER: kafka1:9092,kafka2:9093
+  #     MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
+  #     REDIS_ADDR: redis:6379
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+
+  # consumer:
+  #   build: .
+  #   command: go run ./cmd/consumer
+  #   depends_on:
+  #     kafka-init:
+  #       condition: service_completed_successfully
+  #     mysql:
+  #       condition: service_started
+  #     redis:
+  #       condition: service_started
+  #   environment:
+  #     KAFKA_BROKER: kafka1:9092,kafka2:9093
+  #     MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
+  #     REDIS_ADDR: redis:6379
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+
+  # deploy docker-compose setup
   api:
     build: .
-    command: go run ./cmd/producer
+    command: ./producer   # Chạy trực tiếp file binary đã nén
     ports:
       - "8087:8087"
     depends_on:
@@ -86,13 +125,11 @@ services:
       KAFKA_BROKER: kafka1:9092,kafka2:9093
       MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
       REDIS_ADDR: redis:6379
-    volumes:
-      - .:/app
-    working_dir: /app
+    # Đã XÓA dòng volumes: - .:/app để ứng dụng chạy độc lập và nhẹ nhất
 
   consumer:
     build: .
-    command: go run ./cmd/consumer
+    command: ./consumer   # Chạy trực tiếp file binary đã nén
     depends_on:
       kafka-init:
         condition: service_completed_successfully
@@ -104,6 +141,4 @@ services:
       KAFKA_BROKER: kafka1:9092,kafka2:9093
       MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
       REDIS_ADDR: redis:6379
-    volumes:
-      - .:/app
-    working_dir: /app
+    # Đã XÓA dòng volumes: - .:/app
