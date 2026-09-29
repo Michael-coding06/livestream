@@ -2,7 +2,7 @@
 services:
   api:
     image: ghcr.io/michael-coding06/livestream-backend:staging
-    command: ./producer  # Chạy thẳng file binary đã nén
+    command: ./producer  
     ports:
       - "8087:8087"
     restart: always
@@ -13,7 +13,7 @@ services:
 
   consumer:
     image: ghcr.io/michael-coding06/livestream-backend:staging
-    command: ./consumer  # Chạy thẳng file binary
+    command: ./consumer  
     restart: always
     environment:
       KAFKA_BROKER: kafka1:9092,kafka2:9093
