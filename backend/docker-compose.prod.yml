@@ -1,9 +1,7 @@
 # use optimized configuration for production environment
 services:
   api:
-    build:
-      context: .
-      target: prod       # Chỉ định dùng stage 'prod' trong Dockerfile
+    image: ghcr.io/michael-coding06/livestream-backend:staging
     command: ./producer  # Chạy thẳng file binary đã nén
     ports:
       - "8087:8087"
@@ -14,9 +12,7 @@ services:
       REDIS_ADDR: redis:6379
 
   consumer:
-    build:
-      context: .
-      target: prod       # Chỉ định dùng stage 'prod'
+    image: ghcr.io/michael-coding06/livestream-backend:staging
     command: ./consumer  # Chạy thẳng file binary
     restart: always
     environment:
