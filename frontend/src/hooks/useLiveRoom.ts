@@ -4,6 +4,8 @@ import { uid } from "../data";
 
 const MAX_MESSAGES = 30;
 const MAX_TOASTS = 4;
+const backendUrl = (import.meta.env.VITE_BACKEND_SERVICE_URL || "http://localhost:8087").replace(/\/$/, "");
+const websocketUrl = backendUrl.replace(/^http/, "ws");
 
 export type DonationNotice = {
   id: string;
@@ -60,7 +62,7 @@ export function useLiveRoom(roomId: number | null) {
     setLeaderboard([]);
     setDonationNotice(null);
 
-    const ws = new WebSocket(`ws://localhost:8087/ws/room/${roomId}`);
+    const ws = new WebSocket(`${websocketUrl}/ws/room/${roomId}`);
     ws.onmessage = (event) => {
       try {
         const payload: WsPayload = JSON.parse(event.data);

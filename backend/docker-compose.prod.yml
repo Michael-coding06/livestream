@@ -1,0 +1,25 @@
+# use optimized configuration for production environment
+services:
+  api:
+    build:
+      context: .
+      target: prod       # Chỉ định dùng stage 'prod' trong Dockerfile
+    command: ./producer  # Chạy thẳng file binary đã nén
+    ports:
+      - "8087:8087"
+    restart: always
+    environment:
+      KAFKA_BROKER: kafka1:9092,kafka2:9093
+      MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
+      REDIS_ADDR: redis:6379
+
+  consumer:
+    build:
+      context: .
+      target: prod       # Chỉ định dùng stage 'prod'
+    command: ./consumer  # Chạy thẳng file binary
+    restart: always
+    environment:
+      KAFKA_BROKER: kafka1:9092,kafka2:9093
+      MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
+      REDIS_ADDR: redis:6379

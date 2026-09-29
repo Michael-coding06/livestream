@@ -4,6 +4,9 @@ import useSendFlower from "../api/useSendFlower";
 import type { ChatMessage, LeaderboardEntry, Room } from "../types";
 import type { DonationNotice } from "./useLiveRoom";
 
+const backendUrl = (import.meta.env.VITE_BACKEND_SERVICE_URL || "http://localhost:8087").replace(/\/$/, "");
+const websocketUrl = backendUrl.replace(/^http/, "ws");
+
 const AUTO_USERS = ["alex_dev", "maria_s", "coder99", "sophie_k", "techguru42"];
 const AUTO_TEXT = [
   "Great stream!",
@@ -109,7 +112,7 @@ export function useStudioSession(
     recentFingerprintsRef.current.clear();
     pendingMineRef.current.clear();
 
-    const ws = new WebSocket(`ws://localhost:8087/ws/room/${room.id}`);
+    const ws = new WebSocket(`${websocketUrl}/ws/room/${room.id}`);
 
     console.log("roomid: ", room.id)
 

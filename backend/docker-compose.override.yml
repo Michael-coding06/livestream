@@ -1,0 +1,28 @@
+# by default, docker-compose will use the docker-compose.yml file.
+# This override file is used to override the default settings for development purposes.
+services:
+  api:
+    build:
+      context: .
+      target: dev        # Chỉ định dùng stage 'dev' trong Dockerfile
+    command: go run ./cmd/producer
+    ports:
+      - "8087:8087"
+    volumes:
+      - .:/app           # Mount code để sửa code tới đâu ăn tới đó ở local
+    environment:
+      KAFKA_BROKER: kafka1:9092,kafka2:9093
+      MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
+      REDIS_ADDR: redis:6379
+
+  consumer:
+    build:
+      context: .
+      target: dev        # Chỉ định dùng stage 'dev'
+    command: go run ./cmd/consumer
+    volumes:
+      - .:/app
+    environment:
+      KAFKA_BROKER: kafka1:9092,kafka2:9093
+      MYSQL_DSN: root:root@tcp(mysql:3306)/streampulse
+      REDIS_ADDR: redis:6379
