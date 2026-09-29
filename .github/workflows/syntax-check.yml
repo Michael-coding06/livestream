@@ -109,7 +109,7 @@ jobs:
           script_stop: true # Ensures workflow fails immediately if a command returns an error
           script: |
             echo "Deploying to EC2..."
-            cd /home/ubuntu/livestream
+            cd /home/ubuntu/livestream/backend
 
             # 1. Pull the latest code from GitHub
             git pull origin staging
