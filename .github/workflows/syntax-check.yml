@@ -112,7 +112,7 @@ jobs:
             cd /home/ubuntu/livestream
 
             # 1. Pull the latest code from GitHub
-            git pull origin main
+            git pull origin staging
             
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
             docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 api consumer
