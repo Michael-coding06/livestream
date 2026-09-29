@@ -106,9 +106,10 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.LIVESTREAM_KEY }}
+          script_stop: true # Ensures workflow fails immediately if a command returns an error
           script: |
             echo "Deploying to EC2..."
-            cd /home/ubuntu/livestream-backend
+            cd /home/ubuntu/livestream
 
             # 1. Pull the latest code from GitHub
             git pull origin main
